@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>me.c1200.videobuttons</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="sdpi.css">
+</head>
+
+<body>
+    <div class="sdpi-wrapper">
+        <div class="sdpi-item">
+            <details class="message info">
+                <summary>
+                    Press button on Stream Deck to play. Click for a list of known issues.
+                </summary>
+                <p>Some YouTube videos do not work. Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ.</p>
+                <p>.mp4 does not work. (Won't fix)</p>
+                <p>FPS sometimes drops to an unviewable level.</p>
+                <p>FPS is sometimes bad at the beginning of videos but this should fix itself.</p>
+                <p>Sometimes it stops in the middle of a video. If you wait a bit this should fix itself.</p>
+                <p>Sometimes Spotify songs don't play on the first try. Keep trying and it should work.</p>
+                <p>Spotify only plays a preview of songs despite the iframe having allow="encrypted-media".</p>
+            </details>
+        </div>
+        <div class="sdpi-item">
+            <div class="sdpi-item-label">File/URL:</div>
+            <input class="sdpi-item-value" id="url">
+        </div>
+        <div class="sdpi-item">
+            <div class="sdpi-item-label"></div>
+            <p class="sdpi-item-value" style="font-size: smaller;">
+                If you want to play a file that's on your computer, prepend file:/// to your file path.<br />
+                Example: file:///C:/Users/User/Videos/video.webm
+            </p>
+        </div>
+        <div class="sdpi-item">
+            <div class="sdpi-item-label"></div>
+            <button class="sdpi-item-value" id="creator">Developed by C1200</button>
+        </div>
+    </div>
+
+    <script>
+        var websocket = null;
+        var pluginUUID = null;
+        var actionInfo = {};
+
+        document.getElementById('creator').addEventListener('click', () => {
+            openLink('https://goum.cf/u/c1200');
+        });
+
+        document.getElementById('url').addEventListener('change', (ev) => {
+            setSetting('url', ev.target.value);
+        });
+
+        function openLink(link) {
+            if (!websocket || (websocket.readyState !== 1)) return;
+
+            var json = {
+                "event": "openUrl",
+                "payload": {
+                    "url": link
+                }
+            };
+
+            websocket.send(JSON.stringify(json));
+        }
+
+        function getSettings() {
+            if (!websocket || (websocket.readyState !== 1)) return;
+
+            var json = {
+                'event': 'getSettings',
+                'context': piUUID
+            };
+
+            websocket.send(JSON.stringify(json));
+        }
+
+        function setSetting(name, value) {
+            if (!websocket || (websocket.readyState !== 1)) return;
+
+            var json = {
+                'event': 'setSettings',
+                'context': piUUID,
+                'payload': {
+                    [name]: value
+                }
+            };
+
+            websocket.send(JSON.stringify(json));
+        }
+
+        function onReceiveSettings(settings) {
+            document.getElementById('url').value = settings["url"] || "";
+        }
+
+        function connectElgatoStreamDeckSocket(inPort, inPiUUID, inRegisterEvent, inInfo, inActionInfo) {
+            piUUID = inPiUUID
+            actionInfo = JSON.parse(inActionInfo);
+
+            // Open the web socket
+            websocket = new WebSocket("ws://127.0.0.1:" + inPort);
+
+            function registerPi(inPiUUID) {
+                var json = {
+                    "event": inRegisterEvent,
+                    "uuid": inPiUUID
+                };
+
+                websocket.send(JSON.stringify(json));
+            };
+
+            websocket.onopen = () => {
+                // WebSocket is connected, send message
+                registerPi(piUUID);
+                getSettings();
+            };
+
+            websocket.onmessage = (evt) => {
+                // Received message from Stream Deck
+                var jsonObj = JSON.parse(evt.data);
+                var event = jsonObj['event'];
+                var action = jsonObj['action'];
+                var context = jsonObj['context'];
+
+                if (event === "didReceiveSettings") {
+                    var settings = jsonObj['payload']['settings'];
+                    onReceiveSettings(settings);
+                }
+            };
+
+            websocket.onclose = () => {
+                // Websocket is closed
+            };
+        };
+    </script>
+</body>
+
+</html>

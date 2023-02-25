@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>me.c1200.videobuttons</title>
+    <meta charset="utf-8" />
+    <script src="services.js"></script>
+</head>
+
+<body>
+    <script>
+        var websocket = null;
+        var pluginUUID = null;
+        var playing = false;
+        var DestinationEnum = Object.freeze({
+            "HARDWARE_AND_SOFTWARE": 0,
+            "HARDWARE_ONLY": 1,
+            "SOFTWARE_ONLY": 2
+        });
+        var playIcon = new Image();
+        playIcon.src = 'faded.png';
+
+        var videoButtonsAction = {
+            type: "me.c1200.videobuttons.action",
+            onKeyUp: (context, settings, coordinates, userDesiredState) => {
+                videoButtonsAction.play(context, settings['url']);
+            },
+            tidy: () => { },
+            play: async (context, url) => {
+                if (playing) return videoButtonsAction.tidy();
+                playing = true;
+
+                var service = Object.values(window.vbservices).find((s) => s.match.bind(s)({ url }));
+                if (service) {
+                    var setImage = (b64image) => {
+                        videoButtonsAction.setImage(context, b64image);
+                    }
+                    var showAlert = () => {
+                        videoButtonsAction.showAlert(context);
+                    }
+                    var setTidy = (func) => {
+                        videoButtonsAction.tidy = () => {
+                            func();
+                            videoButtonsAction.tidy = () => { }
+                            playing = false;
+                        }
+                        return videoButtonsAction.tidy;
+                    }
+                    try {
+                        service.handle.bind(service)({ setImage, setTidy, showAlert, url });
+                    } catch (err) {
+                        console.error(err);
+                        videoButtonsAction.tidy();
+                        videoButtonsAction.showAlert(context);
+                    }
+                    return;
+                }
+
+                let timer;
+                var v = document.createElement('video');
+                var c = document.createElement('canvas');
+                var ctx = c.getContext('2d');
+                c.width = c.height = 72;
+                v.src = url;
+                document.body.append(v, c);
+
+                v.onloadeddata = () => {
+                    v.play();
+                    update();
+                }
+
+                v.onended = videoButtonsAction.tidy = () => {
+                    playing = false;
+                    v.remove();
+                    c.remove();
+                    clearTimeout(timer);
+                    ctx.drawImage(playIcon, 0, 0, 72, 72);
+                    videoButtonsAction.setImage(context, c.toDataURL());
+                    videoButtonsAction.tidy = () => { }
+                }
+
+                function update() {
+                    ctx.clearRect(0, 0, c.width, c.height);
+                    var ratio = Math.min(c.width / v.videoWidth, c.height / v.videoHeight);
+                    var x = (c.width - v.videoWidth * ratio) / 2;
+                    var y = (c.height - v.videoHeight * ratio) / 2;
+                    ctx.drawImage(v, 0, 0, v.videoWidth, v.videoHeight, x, y, v.videoWidth * ratio, v.videoHeight * ratio);
+                    videoButtonsAction.setImage(context, c.toDataURL());
+                    timer = setTimeout(update, 0);
+                }
+            },
+            setImage: (context, b64image) => {
+                var json = {
+                    "event": "setImage",
+                    "context": context,
+                    "payload": {
+                        "image": b64image,
+                        "target": DestinationEnum.HARDWARE_AND_SOFTWARE
+                    }
+                };
+
+                websocket.send(JSON.stringify(json));
+            },
+            showAlert: (context) => {
+                var json = {
+                    "event": "showAlert",
+                    "context": context
+                };
+
+                websocket.send(JSON.stringify(json));
+            }
+        };
+
+        function connectElgatoStreamDeckSocket(inPort, inPluginUUID, inRegisterEvent, inInfo) {
+            pluginUUID = inPluginUUID
+
+            // Open the web socket
+            websocket = new WebSocket("ws://127.0.0.1:" + inPort);
+
+            function registerPlugin(inPluginUUID) {
+                var json = {
+                    "event": inRegisterEvent,
+                    "uuid": inPluginUUID
+                };
+
+                websocket.send(JSON.stringify(json));
+            };
+
+            websocket.onopen = () => {
+                // WebSocket is connected, send message
+                registerPlugin(pluginUUID);
+            };
+
+            websocket.onmessage = (evt) => {
+                // Received message from Stream Deck
+                var jsonObj = JSON.parse(evt.data);
+                var event = jsonObj['event'];
+                var action = jsonObj['action'];
+                var context = jsonObj['context'];
+
+                if (event === "keyUp") {
+                    var jsonPayload = jsonObj['payload'];
+                    var settings = jsonPayload['settings'];
+                    var coordinates = jsonPayload['coordinates'];
+                    var userDesiredState = jsonPayload['userDesiredState'];
+                    videoButtonsAction.onKeyUp(context, settings, coordinates, userDesiredState);
+                }
+            };
+
+            websocket.onclose = () => {
+                // Websocket is closed
+            };
+        };
+    </script>
+</body>
+
+</html>

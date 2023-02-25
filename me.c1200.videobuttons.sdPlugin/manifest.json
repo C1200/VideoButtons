@@ -1,0 +1,40 @@
+{
+    "Actions": [
+        {
+            "Icon": "actionIcon",
+            "Name": "Video Button",
+            "States": [
+                {
+                    "Image": "actionDefaultImage"
+                }
+            ],
+            "SupportedInMultiActions": false,
+            "Tooltip": "Video Button",
+            "UUID": "me.c1200.videobuttons.action"
+        }
+    ],
+    "SDKVersion": 2,
+    "Author": "C1200",
+    "CodePath": "code.html",
+    "PropertyInspectorPath": "pi.html",
+    "Description": "Video Buttons",
+    "Name": "Video Buttons",
+    "Icon": "pluginIcon",
+    "Category": "Video Buttons",
+    "CategoryIcon": "categoryIcon",
+    "URL": "https://github.com/c1200/VideoButtons",
+    "Version": "1.0",
+    "OS": [
+        {
+            "Platform": "mac",
+            "MinimumVersion": "10.11"
+        },
+        {
+            "Platform": "windows",
+            "MinimumVersion": "10"
+        }
+    ],
+    "Software": {
+        "MinimumVersion": "4.1"
+    }
+}
